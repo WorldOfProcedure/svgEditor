@@ -73,7 +73,7 @@ svg {
 </table>
 <script src='bezier.js'></script>
 <script>
-
+var spline;
 function setColor() {
 	document.querySelector("path").style.stroke = document.querySelector("input#cStroke").value;
 	document.querySelector("path").style.strokeOpacity = document.querySelector("input#oStroke").value;
@@ -180,6 +180,10 @@ function makeDraggable(evt) {
 	function getPoints(cl){
 		return [...svg.querySelectorAll('circle.'+cl)].map(getPos);
 	}
+	function dash(a, b){
+		//var newElement = document.createElementNS("http://www.w3.org/2000/svg", 'path');
+		
+	}
 	function updatePath(){
 		var id = pathId;
 		points = getPoints('p'+id);
@@ -191,6 +195,10 @@ function makeDraggable(evt) {
 		}
 		if (points[0][0] == points[points.length-1][0] && points[0][1] == points[points.length-1][1])
 			s+='Z'
+		spline = Spline(points);
+		for (var i = 0; i<1; i+=0.1){
+			//console.log(spline.get(i), spline.split(i));
+		}
 		setPath(id, s);
 	}
 	function makePoints(){
@@ -267,7 +275,6 @@ function makeDraggable(evt) {
 	}
 	
 	function del() {
-		console.log('del', lastSelected);
 		if (lastSelected) {
 			type = getType(lastSelected);
 			if (type === 'inst') return kill(lastSelected);
@@ -303,7 +310,6 @@ function makeDraggable(evt) {
 				el = el.parentNode
 			}
 		}
-		//console.log(el, getType(el));
 		if (selectedElement) {
 			lastSelected = selectedElement;
 			moveCur();
@@ -402,7 +408,6 @@ function makeDraggable(evt) {
 	}
 	
 	function wheel(evt){
-		console.log(evt.shiftKey, evt.altKey)
 		if (selectedElement && selectedElement.classList.contains('inst')){
 			if (evt.shiftKey) {
 				rotateElement(selectedElement, Math.sign(evt.deltaY)*2);
