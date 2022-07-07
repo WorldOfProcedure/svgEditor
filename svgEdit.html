@@ -1,0 +1,506 @@
+<body oncontextmenu="return false;">
+<style>
+html, body, table, tbody, tr, td{
+	margin:0;
+	padding:0;
+	height: 1px;
+	vertical-align: top;
+}
+.dragging{
+  cursor: none;
+}
+text{
+	font: .05px sans-serif;
+}
+.btn {
+	cursor: grab; 
+}
+g>circle{
+	fill:darkblue;
+}
+g>circle.draggable{
+	fill:darkgreen;
+}
+circle.center{
+	fill:orange;
+}
+circle#cur{
+	fill:gold;
+}
+svg {
+	width:calc(80vw - 5px);
+	height:calc(100vh - 5px);
+	max-width:100%;
+	max-height:100%;
+	background-color:#f4f4f4;
+}
+</style>
+<table>
+	<tr>
+		<td>
+			<svg viewBox="0 0 2 2" onload="makeDraggable(evt)">
+				
+				<symbol id="x">
+					<path id="p1" d="M .5 .5 C .4 .4, .6 .4, .6 .5" fill-opacity=".5" stroke-width=".005px" ></path>
+				</symbol>
+				
+				<text x="0" y=".05" class="btn copy">Copy</text>
+				<text x="0" y=".10" class="btn add">Add</text>
+				<text x="1.5" y=".05" id="info" class="" text-anchor="right">...</text>	
+				<rect class="bg" x=".5" y=".5" width="1" height="1" fill="#fff"></rect>
+				
+				<circle id="cur" cx="-100" cy="-100" r=".020"></circle>
+				<use href="#x" x="0"  y="0" style="opacity:1.0" />
+				<g class="draggable inst">
+					<use href="#x" x="0"  y="0" style="opacity:0.5" />
+					<circle class='center' cx="1" cy="1" id="" r=".005"></circle>
+				</g>
+				<g id="points" ></g>
+			</svg>
+		</td>
+		<td>
+			<p>Stroke</p>
+			<input id="cStroke" type="color" >Color</input><br/>
+			<input id="oStroke" type="range" value="1" min="0" max="1" step=".05">Opacity</input> <br/>
+			<input id="wStroke" type="range" value="1" min="0" max="10" step=".5">Width</input> <br/>
+			<input id="strokeDash" type="range" value="0" min="0" max="50" step=".05">Dash</input> <br/>
+			<input id="strokeDashStyle" type="range" value="0" min="1" max="9" step="2">DashStyle</input> <br/>
+			<p>Fill</p>
+			<input id="cFill" type="color" value='#f0f0f0'>Color</input><br/>
+			<input id="oFill" type="range" value=".5" min="0" max="1" step=".05">Opacity<br/>
+		</td>
+	</tr>
+</table>
+<script src='bezier.js'></script>
+<script>
+
+function setColor() {
+	document.querySelector("path").style.stroke = document.querySelector("input#cStroke").value;
+	document.querySelector("path").style.strokeOpacity = document.querySelector("input#oStroke").value;
+	document.querySelector("path").style.strokeWidth = document.querySelector("input#wStroke").value * .005;
+	document.querySelector("path").style.fill  = document.querySelector("input#cFill").value;
+	document.querySelector("path").style.fillOpacity  = document.querySelector("input#oFill").value;
+	var dash = document.querySelector("input#strokeDash").value
+	var s = '';
+	if (dash > 0) {
+		dash = 1/dash;
+		var dashStyle = document.querySelector("input#strokeDashStyle").value
+		s = dash + ' '
+		for (var i = 0; i<dashStyle; i++)
+			s += dash/dashStyle + ' ';
+	}
+	document.querySelector("path").style.strokeDasharray = s;
+}
+setColor();
+document.querySelectorAll('input').forEach(function (x) {x.addEventListener('change', setColor); x.addEventListener('mousemove', setColor);}); 
+// todo:
+// obj structure
+// loading
+// getpos relative -> movable center
+
+function kill(x) {
+	x.parentNode.removeChild(x);
+}
+function makeDraggable(evt) {
+	var svg = evt.target;
+	[...svg.querySelectorAll('.draggable')].forEach(makeTransforms);
+
+	var lastSelected, selectedElement, offset, transform;
+	var pathId = 'p1';
+	
+	function round(x, p) {
+		return Math.round(x*p)/p;
+	}
+	
+	function getType(tgt) {
+		if (!tgt)
+			return '';
+		var cl = tgt.classList;
+		if (cl.contains('inst'))
+			return 'inst';
+		if (tgt.tagName === 'g')
+			return 'pointGroup';
+		if (tgt.tagName === 'circle')
+		{
+			if (cl.contains('point')) {
+				if (cl.contains('parented'))
+					return 'pointParented';
+				else
+					return 'pointFree';
+			}
+			else {
+				return 'circle';
+			}
+		}
+		return ''
+	}
+	
+	function setPath(id, d) {
+		path = svg.getElementById(id)
+		path.setAttribute('d', d)
+	}
+	function getPos(tgt){
+		if (tgt.tagName === 'g' && !tgt.classList.contains('inst'))
+			tgt = tgt.querySelector('.parented');
+			
+		var el = tgt;
+		var tx = 0, ty = 0;
+		var multx = 1, multy = 1;
+		while (el !== svg && el.id !== 'points'){
+			var transforms = el.transform.baseVal;
+			if (transforms.length > 1) {
+				matrix = transforms.getItem(1).matrix
+				tx *= matrix.a;
+				ty *= matrix.d;
+				multx *=  matrix.a;
+				multy *=  matrix.d;
+			}
+			if (transforms.length > 0 && transforms.getItem(0).type === SVGTransform.SVG_TRANSFORM_TRANSLATE) {
+				matrix = transforms.getItem(0).matrix
+				tx += matrix.e;
+				ty += matrix.f;
+			}
+			el = el.parentNode;
+		}
+		
+		var x = tgt.getAttribute('cx');
+		if (x === null)
+			x = tgt.getAttribute('x');
+			
+		var y = tgt.getAttribute('cy');
+		if (y === null)
+			y = tgt.getAttribute('y');
+			
+		if (x === null)
+			x = 0;
+		if (y === null)
+			y = 0;
+		return [parseFloat(x)*multx + tx, parseFloat(y)*multy + ty]
+	}
+	function getPoints(cl){
+		return [...svg.querySelectorAll('circle.'+cl)].map(getPos);
+	}
+	function updatePath(){
+		var id = pathId;
+		points = getPoints('p'+id);
+		s = '';
+		for (var i = 0; i<points.length; i++){ 
+			var type = (i==0) ? 'M' : ((i%3==1) ? 'C' : ',')
+			s += type + ' '
+			s += points[i][0]+' '+points[i][1]+' '
+		}
+		setPath(id, s);
+	}
+	function makePoints(){
+		var id = 'p'+pathId;
+		[...svg.querySelectorAll('g.'+id)].forEach(kill);
+		s = '';
+		for (var i = 0; i<points.length; i++){ 
+			var type = (i==0) ? 'M' : ((i%3==1) ? 'C' : ',')
+			if (i === 0){
+				s += '<g class="draggable '+id+'">';
+			}
+			else if (i%3 === 2)
+			{
+				s += '</g><g class="draggable '+id+'">';
+			}
+			s += '<circle class="point '+ ((i%3)?'draggable ':'parented ') +id+'" cx="'+points[i][0]+'" cy="'+points[i][1]+'" r=".011" pid="'+i+'"/>';
+		}
+		s += '</g>';
+		svg.querySelector('g#points').innerHTML += s;
+		[...svg.querySelectorAll('.'+id)].forEach(makeTransforms);
+	}
+	svg.addEventListener('mousedown', mouseDown, false);
+	document.addEventListener('keydown', keyDown, false);
+	svg.addEventListener('mousemove', drag, false);
+	svg.addEventListener('mouseup', endDrag, false);
+	svg.addEventListener('mouseleave', endDrag);
+	svg.addEventListener('wheel', wheel);
+	var points = []
+	for (var i = 0; i<13; i++){
+		points.push([round((1+Math.cos(i*2*Math.PI/12)/2), 4), round((1+Math.sin(i*2*Math.PI/12)/2), 4)]);
+		
+		//points.push([1+Math.cos(i*2*Math.PI/12)/2, 1+Math.sin(i*2*Math.PI/12)/2]);
+	}
+	makePoints();
+	updatePath();
+
+	function getMousePosition(evt) {
+		var CTM = svg.getScreenCTM();
+		return {
+			x: (evt.clientX - CTM.e) / CTM.a,
+			y: (evt.clientY - CTM.f) / CTM.d
+		};
+	}
+	
+	function makeTransforms(el)
+	{
+		var transforms = el.transform.baseVal;
+		if (transforms.length > 0 && transforms.getItem(0).type === SVGTransform.SVG_TRANSFORM_TRANSLATE)
+			return
+		var translate = svg.createSVGTransform();
+		translate.setTranslate(0, 0);
+		transforms.insertItemBefore(translate, 0);
+	}
+	
+	function keyDown(evt){
+		if (evt.code == 'Delete')
+			del();
+	}
+	
+	function mouseDown(evt){
+		el = evt.target;
+		if (el.classList.contains('copy')) return clbrd();
+		if (el.classList.contains('add')) 
+			if (lastSelected.classList.contains('inst')) return makeInstance(); else return addPoint();			
+		if (evt.which === 1) return startDrag(evt);
+		if (evt.which === 3) {evt.preventDefault(); return removePoint(el);}
+		
+		return false;
+	}
+	
+	function makeInstance(){
+		var clone = lastSelected.cloneNode(true);
+		svg.appendChild(clone);
+	}
+	
+	function del() {
+		console.log('del', lastSelected);
+		if (lastSelected) {
+			type = getType(lastSelected);
+			if (type === 'inst') return kill(lastSelected);
+			if (type === 'pointGroup') return removePoint(lastSelected.querySelector('.parented'));
+		}
+		moveCur();
+	}
+	
+	function removePoint(el) {
+		if (getType(el) === 'pointParented' && points.length > 3)
+		{
+			var id = parseInt(el.getAttribute('pid')) - 1;
+			var extraPoint = false
+			if (id > points.length - 4)
+				id = points.length - 4;
+			if (id < 0)
+				id = 0;
+			points.splice(id, 3);
+			makePoints();
+			updatePath();
+		}
+	}
+
+	function startDrag(evt) {
+		el = evt.target
+		selectedElement = false
+		while (!selectedElement && el != svg)
+		{
+			if  (el.classList.contains('draggable')){
+				selectedElement = el;
+			} 
+			else {
+				el = el.parentNode
+			}
+		}
+		//console.log(el, getType(el));
+		if (selectedElement) {
+			lastSelected = selectedElement;
+			moveCur();
+			svg.classList.add('dragging');
+			offset = getMousePosition(evt);
+			transform = selectedElement.transform.baseVal.getItem(0);
+			offset.x -= transform.matrix.e;
+			offset.y -= transform.matrix.f;
+		}
+	}
+
+	function drag(evt) {
+		evt.preventDefault();
+		if (selectedElement) {
+			var coord = getMousePosition(evt);
+			var tx = coord.x - offset.x;
+			var ty = coord.y - offset.y
+			if (evt.ctrlKey) {
+				tx = round(tx, 20);
+				ty = round(ty, 20);
+			}
+			transform.setTranslate(tx, ty);
+			var type = getType(selectedElement)
+			if (evt.shiftKey && type == 'pointFree')
+				enforceSymmetry();
+			if (type.startsWith('point'))
+				updatePath();
+			moveCur();
+		}
+	}
+	function movePoint(p, d){
+		var t = p.transform.baseVal.getItem(0);
+		t.setTranslate(t.matrix.e + d[0], t.matrix.f + d[1]);
+	}
+
+	function endDrag(evt) {
+		if (selectedElement){
+			if (selectedElement.tagName == 'circle' || selectedElement.tagName == 'g' && !selectedElement.classList.contains('inst')) {
+				snap(selectedElement);
+			}
+		}
+		svg.classList.remove('dragging');
+		selectedElement = false;
+	}
+	
+	function snap(e){
+		var el = e;
+		if (e.tagName === 'g'){
+			e = e.querySelector('circle.parented');
+		}
+		
+		var self_id = parseInt(e.getAttribute('pid'))
+		var self = points[self_id];
+		
+		for (var i = 0; i<points.length; i++) { 
+			if (i != self_id) {
+				var dx = points[i][0]-self[0];
+				var dy = points[i][1]-self[1];
+				if (dx*dx + dy*dy < 0.0004){
+					movePoint(el, [dx, dy]);
+					updatePath();
+					moveCur();
+				}
+			}
+		}
+	}
+	
+	
+	function scaleElement(el, d){
+		makeTransforms(el);
+		var transforms = el.transform.baseVal;
+		var scale;
+		if (!(transforms.length > 1 )) {
+			scale = svg.createSVGTransform();
+			scale.setScale(1, 1);
+			transforms.insertItemBefore(scale, 1);
+		}
+		scale = transforms.getItem(1);
+		scale.matrix.a += d;
+		scale.matrix.d += d;
+		moveCur();
+	}
+	
+	function rotateElement(el, r){
+		makeTransforms(el);
+		var transforms = el.transform.baseVal;
+		var rot;
+		if (!(transforms.length > 2 )) {
+			rot = svg.createSVGTransform();
+			rot.setRotate(0, 0, 0);
+			transforms.insertItemBefore(rot, 2);
+		}
+		rot = transforms.getItem(2);
+		rot.setRotate(rot.angle+r, 1, 1);
+		moveCur();
+	}
+	
+	function wheel(evt){
+		console.log(evt.shiftKey, evt.altKey)
+		if (selectedElement && selectedElement.classList.contains('inst')){
+			if (evt.shiftKey) {
+				rotateElement(selectedElement, Math.sign(evt.deltaY)*2);
+			} 
+			else {
+				scaleElement(selectedElement, Math.sign(evt.deltaY)/100);
+			}
+		}
+	}
+	
+	function enforceSymmetry(){
+		if (selectedElement.parentNode != svg){
+			var tgt = null;
+			[...selectedElement.parentNode.querySelectorAll('circle.draggable')].forEach(function(el){
+				if (el != selectedElement){
+					tgt = el;
+				}
+			});
+			if (!tgt){
+				if (Math.abs(points[points.length-1][0] - points[0][0]) < 0.00001 && Math.abs(points[points.length-1][1] - points[0][1] < 0.00001))
+					if (selectedElement.getAttribute('pid') == 1)
+						tgt = document.querySelectorAll('.point')[points.length - 2];
+					else if (selectedElement.getAttribute('pid') == points.length - 2)
+						tgt = document.querySelectorAll('.point')[1];
+			}
+			if (tgt){
+				id = parseInt(tgt.getAttribute('pid'));
+				tid = id;
+				self = points[selectedElement.getAttribute('pid')];
+				target = points[id];
+				if (id%3 == 2) id++; else id--;
+				if (id >= 0 && id < points.length)
+					parent = points[id];
+				x = parent[0] * 2 - self[0];
+				y = parent[1] * 2 - self[1];
+				err = [x - points[tid][0], y - points[tid][1]];
+				movePoint(tgt, err);
+			}
+		}
+	}
+	
+	function clbrd(){
+		navigator.clipboard.writeText(JSON.stringify(points));
+		alert('Copied curve to clipboard');
+	}
+	
+	function addPoint() {
+		var id = null;
+		id = lastSelected.getAttribute('pid');
+		if (id === null)
+			id = lastSelected.querySelector('.parented').getAttribute('pid');
+		if (id === null)
+			id = points.length-1;
+		else
+			id = parseInt(id);
+		var point = [...points[id]];
+		var lastP, d;
+		if (id == 0){
+			lastP = lastP = [...points[id + 1]];
+			d = [lastP[0] - point[0], lastP[1] - point[1]];
+		}
+		else {
+			lastP = [...points[id - 1]];
+			d = [point[0] - lastP[0], point[1] - lastP[1]];
+		}
+			
+		for (var i = 0; i<3; i++) {
+			point[0] += d[0]/5;
+			point[1] += d[1]/5;
+			points.splice(id+1, 0, [...point]);
+			id++;
+		}
+		makePoints();
+		updatePath();
+	}
+	
+	function pConv(p){
+		return [p.x, p.y];
+	}
+	
+	
+	var fmt = new Intl.NumberFormat("en-US", {minimumFractionDigits: 3})
+	
+	infoText = svg.querySelector('text#info');
+	
+	function moveCur(){
+		var xy
+		var el = selectedElement;
+		if (!el)
+			el == lastSelected;
+		if (!el)
+			return;
+		if (el.classList.contains('inst'))
+			xy = getPos(el.querySelector('.center'))
+		else
+			xy = getPos(el)
+		var curEl = svg.getElementById('cur');
+		curEl.setAttribute('cx', xy[0]);
+		curEl.setAttribute('cy', xy[1]);
+		infoText.innerHTML = fmt.format(xy[0])+', '+fmt.format(xy[1])
+	}
+}
+ </script>
