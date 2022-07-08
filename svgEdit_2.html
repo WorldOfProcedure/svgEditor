@@ -1,0 +1,80 @@
+<html>
+<head>
+	<style>
+	html, body, table, tbody, tr, td{
+		margin:0;
+		padding:0;
+		height: 1px;
+		vertical-align: top;
+	}
+	.dragging{
+	  cursor: none;
+	}
+	text{
+		font: .05px sans-serif;
+	}
+	.btn {
+		cursor: grab; 
+	}
+	g>circle{
+		fill:darkblue;
+	}
+	g>circle.draggable{
+		fill:darkgreen;
+	}
+	circle.center{
+		fill:orange;
+	}
+	circle#cur{
+		fill:gold;
+	}
+	svg {
+		width:calc(80vw - 5px);
+		height:calc(100vh - 5px);
+		max-width:100%;
+		max-height:100%;
+		background-color:#f4f4f4;
+	}
+	</style>
+	<script src='bezier.js'></script>
+	<script src='drawSpline.js'></script>
+</head>
+<body>
+</body>
+<table>
+	<tr>
+		<td>
+			<svg viewBox="0 0 2 2" onload="makeDraggable(evt)">
+				
+				<symbol id="x">
+					<path id="p1" d="M .5 .5 C .4 .4, .6 .4, .6 .5" fill-opacity=".5" stroke-width=".005px" ></path>
+				</symbol>
+				
+				<text x="0" y=".05" class="btn copy">Copy</text>
+				<text x="0" y=".10" class="btn add">Add</text>
+				<text x="1.5" y=".05" id="info" class="" text-anchor="right">...</text>	
+				<rect class="bg" x=".5" y=".5" width="1" height="1" fill="#fff"></rect>
+				
+				<circle id="cur" cx="-100" cy="-100" r=".020"></circle>
+				<use href="#x" x="0"  y="0" style="opacity:1.0" />
+				<g class="draggable inst">
+					<use href="#x" x="0"  y="0" style="opacity:0.5" />
+					<circle class='center' cx="1" cy="1" id="" r=".005"></circle>
+				</g>
+				<g id="points" ></g>
+			</svg>
+		</td>
+		<td>
+			<p>Stroke</p>
+			<input id="cStroke" type="color" >Color</input><br/>
+			<input id="oStroke" type="range" value="1" min="0" max="1" step=".05">Opacity</input> <br/>
+			<input id="wStroke" type="range" value="1" min="0" max="10" step=".5">Width</input> <br/>
+			<input id="strokeDash" type="range" value="0" min="0" max="50" step=".05">Dash</input> <br/>
+			<input id="strokeDashStyle" type="range" value="0" min="1" max="9" step="2">DashStyle</input> <br/>
+			<p>Fill</p>
+			<input id="cFill" type="color" value='#f0f0f0'>Color</input><br/>
+			<input id="oFill" type="range" value=".5" min="0" max="1" step=".05">Opacity<br/>
+		</td>
+	</tr>
+</table>
+</html>
