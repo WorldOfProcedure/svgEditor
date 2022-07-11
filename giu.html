@@ -1,0 +1,199 @@
+<html>
+<head>
+	<style>
+	table, td, tr, html, body{
+		border: 0px;
+		padding: 0px;
+		margin: 0px;
+		height: 100%;
+		max-height: 100vh;
+	}
+	#maintable{
+		width: 100%;
+	}
+	td{
+		border-radius: 7px;
+		vertical-align: top;
+	}
+	#tdmenu{
+		background-color: #ddd;		
+	}
+	#tdmenu > div{
+		width: 100px;
+		display: inline-block;
+		border-right: 1px solid #000;
+	}
+	#tdwork{
+		width: calc(100% - 150px);
+		background-color: #002;
+	}
+	#tdsidebar{
+		width: 150px;
+		overflow: hidden;
+	}
+	#layercontainer {
+		padding:4px;
+		list-style-type: none;
+		overflow-y: auto;
+		height: calc(100% - 3em);
+		margin-top: 0px;
+	}
+	#layercontainer > li {
+		cursor: pointer;
+		cursor: grabbing;
+		border: 3px solid #666;
+		background-color: #ddd;
+		border-radius: 7px;
+		width:90%;
+		margin:.1em;
+		padding:.1em;
+		list-style-type: none;
+	}
+	.selected{
+		font-weight: bold;
+	}
+	#layercontainer > li.selected{
+		border-color: #000;
+		background-color: #eee;
+	}
+	.tbutton {
+		cursor: pointer;
+	}
+	#tdsidebar >  div{
+		height: calc(100vh - 1.5em);
+	}
+	</style>
+	<script>
+// todo: 
+// layer swap cursors
+// rename layers
+// delete layers
+var selectedLayer = '';
+function kill(x) {
+	x.parentNode.removeChild(x);
+}
+function getLayers() {
+	return [...document.querySelectorAll('#layercontainer>li')];
+}
+function getSelectedLayer() {
+	return document.querySelector('#layercontainer>li.selected');
+}
+function getLayerNames() {
+	return getLayers().map((x) => x.innerText)
+}
+function addLayerEventListeners(el){
+		el.addEventListener('dragend', dragEnd);
+		el.addEventListener('click', layerClick);
+		el.addEventListener('dragover', dragOver);
+		el.addEventListener('dragstart', dragStart);
+		el.addEventListener('dragstart', dragStart);
+		el.addEventListener('drop', layerDrop);
+		el.addEventListener('dragnter', layerDrop);
+}
+function addLayer() {
+	var container = document.querySelector('#layercontainer');
+	var selectedLayer = document.querySelector('#layercontainer>li.selected');
+	var newLayer = document.createElement("li");
+	addLayerEventListeners(newLayer);
+	newLayer.setAttribute('draggable', 'true');
+	var name = 'Layer '
+	var ls = getLayerNames();
+	for (var i = 1; ls.includes(name+i); i++) {}
+	newLayer.innerText = name + i;
+	
+	if (selectedLayer && selectedLayer.nextSibling)
+		container.insertBefore(newLayer, selectedLayer.nextSibling);
+	else
+		container.appendChild(newLayer);
+	selectLayer(newLayer);
+}
+function renameLayer() {
+	var newName = prompt('Rename layer', selectedLayer);
+	if (!newName)
+		return
+	newName = newName.trim();
+	var el = getSelectedLayer();
+	el.innerText = newName;
+	selectLayer(el);
+}
+function deleteLayer() {
+	if (confirm('Delete '+selectedLayer+'?')) {
+		kill(getSelectedLayer());
+		selectedLayer = null;
+		selectLayer(getLayers()[0]);
+	}
+}
+
+//https://web.dev/drag-and-drop/
+//https://stackoverflow.com/questions/10588607/tutorial-for-html5-dragdrop-sortable-list
+var draggedLayer = null;
+
+function dragOver(e) {
+  e.dataTransfer.dropEffect = "copy";
+  if (isBefore(draggedLayer, e.target))
+	e.target.parentNode.insertBefore(draggedLayer, e.target);
+  else
+	e.target.parentNode.insertBefore(draggedLayer, e.target.nextSibling);
+}
+
+function dragEnd() {
+  updateLayers();
+  draggedLayer = null;
+}
+
+function dragStart(e) {
+  e.dataTransfer.effectAllowed = 'copyMove';
+  e.dataTransfer.setData('text/plain', null);
+  draggedLayer = e.target;
+}
+
+function isBefore(el1, el2) {
+  var cur;
+  if (el2.parentNode === el1.parentNode) {
+	for (cur = el1.previousSibling; cur; cur = cur.previousSibling) {
+	  if (cur === el2) return true;
+	}
+  }
+  return false;
+}
+
+function layerDrop(e){
+	alert(1);
+}
+function layerClick(e){
+	selectLayer(e.target);
+}
+function selectLayer(el){
+	getLayers().forEach((el) => {el.classList.remove('selected');});
+	el.classList.add('selected');
+	selectedLayer = el.innerText;
+	console.log(selectedLayer);
+}
+
+function updateLayers () {
+	console.log(
+		getLayerNames()
+	);
+}
+
+document.addEventListener('DOMContentLoaded', (e) => {addLayer();});
+	</script>
+</head>
+<table id='maintable'>
+	<thead>
+		<td colspan=2 id='tdmenu'> Mode : <div class='selected' >Objects</div> <div class='' >Points</div>  </td>
+	</thead>
+	<tbody>
+		<tr>
+			<td id='tdwork'>work</td>
+			<td id='tdsidebar'>
+				<div id ='divlayers'>Layers<br>
+					<b class='tbutton' onclick='addLayer()'>Add</b> <b class='tbutton' onclick='renameLayer()'>Rename</b> <b class='tbutton' onclick='deleteLayer()'>Delete</b>
+						<ul id='layercontainer'>
+						</ul>
+				</div>
+			</td>
+		</tr>
+	</tbody>
+</table>
+</html>
